@@ -1,126 +1,218 @@
-body {
-  margin: 0;
-  padding: 0;
-  background-color: black;
-  overflow: hidden;
-  font-family: Arial, sans-serif;
+const gameArea = document.getElementById('gameArea');
+const player = document.getElementById('player');
+const replayButton = document.getElementById('replayButton');
+const scoreDisplay = document.getElementById('scoreDisplay');
+const welcomeScreen = document.getElementById('welcomeScreen');
+const startButton = document.getElementById('startButton');
+
+let playerPos = gameArea.clientWidth / 2;
+let lasers = [];
+let aliens = [];
+let alienSpeed = 1; // Static speed, no difficulty adjustment
+let gameOver = false;
+let score = 0;
+let keys = {};
+let canShoot = true;
+
+function movePlayer() {
+  if (gameOver) return;
+
+  if (keys.left) {
+    playerPos -= 7;
+    if (playerPos < 0) playerPos = 0;
+  }
+  if (keys.right) {
+    playerPos += 7;
+    if (playerPos + player.offsetWidth > gameArea.clientWidth) {
+      playerPos = gameArea.clientWidth - player.offsetWidth;
+    }
+  }
+  player.style.left = `${playerPos}px`;
 }
 
-#welcomeScreen {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  text-align: center;
-  color: lime;
-  background-color: rgba(0, 0, 0, 0.7);
-  padding: 20px;
-  border-radius: 10px;
-  z-index: 1;
+function shootLaser() {
+  if (gameOver || !canShoot) return;
+
+  const laser = document.createElement('div');
+  laser.classList.add('laser');
+  laser.style.left = `${playerPos + player.offsetWidth / 2 - 2}px`;
+  laser.style.bottom = '70px';
+  gameArea.appendChild(laser);
+  lasers.push(laser);
+
+  canShoot = false;
+  setTimeout(() => canShoot = true, 300);
 }
 
-#welcomeScreen h1 {
-  margin: 0;
-  font-size: 2em;
+function spawnAlien() {
+  if (gameOver) return;
+
+  const alien = document.createElement('div');
+  alien.classList.add('alien');
+  alien.style.left = `${Math.random() * (gameArea.clientWidth - 50)}px`;
+  alien.style.top = '0px';
+  gameArea.appendChild(alien);
+  aliens.push(alien);
 }
 
-#welcomeScreen ul {
-  list-style: none;
-  padding: 0;
+function updateLasers() {
+  lasers.forEach((laser, index) => {
+    let laserBottom = parseInt(laser.style.bottom);
+    laserBottom += 5;
+    laser.style.bottom = `${laserBottom}px`;
+
+    if (laserBottom > gameArea.clientHeight) {
+      laser.remove();
+      lasers.splice(index, 1);
+    }
+  });
 }
 
-#welcomeScreen li {
-  margin: 10px 0;
+function updateAliens() {
+  aliens.forEach((alien, index) => {
+    let alienTop = parseInt(alien.style.top);
+    alienTop += alienSpeed;
+    alien.style.top = `${alienTop}px`;
+
+    if (alienTop + 50 >= gameArea.clientHeight) {
+      endGame();
+    }
+  });
 }
 
-#startButton {
-  padding: 15px 30px;
-  font-size: 1.2em;
-  background-color: lime;
-  color: black;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
+function detectCollisions() {
+  lasers.forEach((laser, laserIndex) => {
+    aliens.forEach((alien, alienIndex) => {
+      const laserRect = laser.getBoundingClientRect();
+      const alienRect = alien.getBoundingClientRect();
+
+      if (
+        laserRect.left < alienRect.right &&
+        laserRect.right > alienRect.left &&
+        laserRect.top < alienRect.bottom &&
+        laserRect.bottom > alienRect.top
+      ) {
+        alien.remove();
+        laser.remove();
+        aliens.splice(alienIndex, 1);
+        lasers.splice(laserIndex, 1);
+        incrementScore();
+      }
+    });
+  });
 }
 
-#startButton:hover {
-  background-color: lightgreen;
+function incrementScore() {
+  score += 1;
+  scoreDisplay.textContent = `Score: ${score}`;
 }
 
-#gameArea {
-  position: relative;
-  width: 60vw; /* Reduced width */
-  height: 85vh; /* Reduced height */
-  background: radial-gradient(circle, black, darkblue);
-  border: 2px solid lime;
-  margin: auto;
-  top: 5%;
-  border-radius: 10px;
-  display: none; /* Hide initially */
-}
+function gameLoop() {
+  if (!gameOver) {
+    movePlayer();
+    updateLasers();
+    updateAliens();
+    detectCollisions();
 
-@media only screen and (max-width: 767px) {
-  #gameArea {
-    width: 100vw; /* Full width for smaller screens */
-    height: 93vh; /* Full height for smaller screens */
-    top: 0;
-    left: 0;
-    border: none; /* Remove border for a cleaner look on mobile */
-    border-radius: 0; /* Remove border radius for full screen */
+    if (keys.shoot) shootLaser();
+
+    if (Math.random() < 0.01) {
+      spawnAlien();
+    }
+
+    requestAnimationFrame(gameLoop);
   }
 }
 
-#player {
-  position: absolute;
-  bottom: 20px;
-  left: 50%;
-  width: 50px;
-  height: 50px;
-  background-image: url('assets/spaceship.jpeg');
-  background-size: cover;
-  transform: translateX(-50%);
-  transition: left 0.1s ease-out; /* Smooth movement */
+function endGame() {
+  gameOver = true;
+  replayButton.style.display = 'block';
 }
 
-#scoreDisplay {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  font-size: 24px;
-  color: lime;
+function replayGame() {
+  lasers.forEach(laser => laser.remove());
+  aliens.forEach(alien => alien.remove());
+
+  lasers = [];
+  aliens = [];
+  playerPos = gameArea.clientWidth / 2;
+  player.style.left = `${playerPos}px`;
+  score = 0;
+  alienSpeed = 1; // Reset to static speed
+  scoreDisplay.textContent = `Score: ${score}`;
+
+  gameOver = false;
+  replayButton.style.display = 'none';
+  gameLoop();
 }
 
-.laser {
-  position: absolute;
-  width: 5px;
-  height: 20px;
-  background-color: lime;
-  box-shadow: 0 0 5px lime; /* Glow effect */
+function startGame() {
+  welcomeScreen.style.display = 'none';
+  gameArea.style.display = 'block';
+  gameLoop();
 }
 
-.alien {
-  position: absolute;
-  width: 50px;
-  height: 50px;
-  background-image: url('assets/alien.jpeg');
-  background-size: cover;
+startButton.addEventListener('click', startGame);
+
+document.addEventListener('keydown', (e) => {
+  switch (e.key) {
+    case 'ArrowLeft':
+      keys.left = true;
+      break;
+    case 'ArrowRight':
+      keys.right = true;
+      break;
+    case ' ':
+      keys.shoot = true;
+      break;
+  }
+});
+
+document.addEventListener('keyup', (e) => {
+  switch (e.key) {
+    case 'ArrowLeft':
+      keys.left = false;
+      break;
+    case 'ArrowRight':
+      keys.right = false;
+      break;
+    case ' ':
+      keys.shoot = false;
+      break;
+  }
+});
+
+// Add touch controls for mobile devices
+function handleTouch(e) {
+  if (e.touches.length > 0) {
+    const touch = e.touches[0];
+    const touchX = touch.clientX;
+    const touchY = touch.clientY;
+    
+    // Check if touch is in the left half of the screen
+    if (touchX < window.innerWidth / 2) {
+      keys.left = true;
+      keys.right = false;
+    } else {
+      keys.right = true;
+      keys.left = false;
+    }
+    
+    // Check if touch is on the bottom quarter of the screen
+    if (touchY > window.innerHeight * 0.75) {
+      keys.shoot = true;
+    } else {
+      keys.shoot = false;
+    }
+  }
 }
 
-#replayButton {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  padding: 15px 30px;
-  font-size: 24px;
-  background-color: lime;
-  color: black;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  display: none; /* Hide initially */
+function handleTouchEnd(e) {
+  keys.left = false;
+  keys.right = false;
+  keys.shoot = false;
 }
 
-#replayButton:hover {
-  background-color: lightgreen;
-}
+document.addEventListener('touchstart', handleTouch);
+document.addEventListener('touchend', handleTouchEnd);
+document.addEventListener('touchmove', handleTouch);
